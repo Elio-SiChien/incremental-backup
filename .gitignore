@@ -1,0 +1,8 @@
+/config.local.json
+/logs/
+/vendor/
+__pycache__/
+*.pyc
+.pytest_cache/
+.test-work/
+/*.local.txt

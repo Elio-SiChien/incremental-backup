@@ -1,0 +1,23 @@
+name: Tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install rclone
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://downloads.rclone.org/v1.75.2/rclone-v1.75.2-windows-amd64.zip -OutFile rclone.zip
+          if ((Get-FileHash rclone.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8a9db2bad1dc79a65b3348fd857069598e2aab7cf4d118b77b1df23055aff818') {
+            throw 'rclone archive checksum mismatch'
+          }
+          Expand-Archive rclone.zip -DestinationPath vendor
+          Remove-Item -LiteralPath rclone.zip
+      - name: Unit and real rclone integration tests
+        run: python -m unittest discover -s tests -v
