@@ -1,5 +1,11 @@
 # Changelog
 
+## Documentation — 2026-10-25
+
+- Reorganize the README around backup behavior, preview-first setup and Codex use.
+- Add original light/dark flow diagrams for desktop and narrow screens.
+- Preserve the full operating instructions in `docs/user-guide.md`.
+
 ## 0.1.0.2 — 2026-10-25
 
 - Add independent private profiles for arbitrary source/destination pairs.

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="260" viewBox="0 0 1120 260" role="img" aria-labelledby="title desc">
+  <title id="title">工作盘到移动硬盘的增量备份</title>
+  <desc id="desc">读取源文件，比较内容，只复制新增和改动。目标旧文件归档，目标独有文件保留，完成后复核。</desc>
+  <style>
+    .bg{fill:#f8fafc}.card{fill:#fff;stroke:#dbe3ed}.label{fill:#0f172a}.muted{fill:#52647a}.blue{fill:#2563eb}.teal{fill:#0f766e}.line{stroke:#94a3b8}.history{fill:#ecfdf5;stroke:#a7d8c7}.history-text{fill:#176552}
+    text{font-family:Arial,'Microsoft YaHei','Noto Sans CJK SC',sans-serif}
+    @media(prefers-color-scheme:dark){.bg{fill:#0d1117}.card{fill:#161b22;stroke:#303b49}.label{fill:#e6edf3}.muted{fill:#a6b5c7}.blue{fill:#79aaff}.teal{fill:#5ee0c0}.line{stroke:#6c819b}.history{fill:#122b27;stroke:#28594c}.history-text{fill:#8fe0c2}}
+  </style>
+  <rect class="bg" width="1120" height="260" rx="16"/>
+  <rect class="card" x="24" y="24" width="290" height="142" rx="12"/>
+  <rect class="card" x="415" y="24" width="290" height="142" rx="12"/>
+  <rect class="card" x="806" y="24" width="290" height="142" rx="12"/>
+  <text class="blue" x="46" y="54" font-size="12" font-weight="700" letter-spacing="1.5">01 / SOURCE</text>
+  <text class="label" x="46" y="91" font-size="23" font-weight="700">工作盘 · 主版本</text>
+  <text class="muted" x="46" y="123" font-size="15">文件留在源目录，按内容比较</text>
+  <text class="blue" x="437" y="54" font-size="12" font-weight="700" letter-spacing="1.5">02 / CHANGES</text>
+  <text class="label" x="437" y="91" font-size="23" font-weight="700">只复制新增与改动</text>
+  <text class="muted" x="437" y="123" font-size="15">相同文件跳过，不重复传输</text>
+  <text class="teal" x="828" y="54" font-size="12" font-weight="700" letter-spacing="1.5">03 / BACKUP</text>
+  <text class="label" x="828" y="91" font-size="23" font-weight="700">移动硬盘 · 副本</text>
+  <text class="muted" x="828" y="123" font-size="15">保留独有文件，复制后校验</text>
+  <path class="line" d="M331 95h65m-10-8 10 8-10 8M722 95h65m-10-8 10 8-10 8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect class="history" x="24" y="186" width="1072" height="50" rx="10"/>
+  <circle class="teal" cx="49" cy="211" r="4"/>
+  <text class="history-text" x="65" y="217" font-size="15"><tspan font-weight="700">覆盖前保留旧版本</tspan><tspan dx="20">目标旁的 .versions 目录 · 可按原相对路径找回文件</tspan></text>
+</svg>

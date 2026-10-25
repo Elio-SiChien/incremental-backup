@@ -1,130 +1,112 @@
-# Incremental Backup · 增量备份工作流
+<div align="center">
 
-基于 [rclone](https://github.com/rclone/rclone) 的 Windows 本地文件备份工具。
-只复制新增、内容改动的文件，保留目标盘独有文件，覆盖前留存旧版本，完成后逐字节复核。
-适用于工作盘 → 移动硬盘，目标目录原有文件可以直接复用，无需重新全量复制。
+# Incremental Backup
 
-> 本工具以源目录为主版本。同名文件有差异时，即使目标文件更新，也会先归档目标旧文件，再用源文件替换。不要用它合并两边独立编辑的工作。
+**工作盘 → 移动硬盘，只复制新增和改动的文件。**
 
-## 快速使用
+复用硬盘里的已有副本 · 覆盖前保留旧版本 · 复制后完整校验
 
-需要 Python 3.10+ 和 [rclone 官方 Windows 版](https://rclone.org/downloads/)。
-将 rclone 加入 PATH，或把官方 ZIP 解压到本项目的 `vendor/`，形成 `vendor/rclone-版本-windows-amd64/rclone.exe`。
-本机测试版本为 rclone 1.75.2。可从对应官方版本目录的 SHA256SUMS 核对 ZIP 校验值。
-Windows 启动器使用 `python` 命令；若你的环境使用 `py`，请在终端用 `py backup.py ...`。
+[![Windows](https://img.shields.io/badge/Windows-本地备份-2563eb?style=flat-square)](#快速使用) [![Python](https://img.shields.io/badge/Python-3.10%2B-2563eb?style=flat-square)](#快速使用) [![Powered by rclone](https://img.shields.io/badge/Powered_by-rclone-0f766e?style=flat-square)](#为什么基于-rclone) [![License: MIT](https://img.shields.io/badge/License-MIT-475569?style=flat-square)](LICENSE)
 
-先进入工具目录，绑定已经存在的两个目录（下面是示例，请替换）：
+[快速开始](#快速使用) · [备份规则](#备份规则) · [Codex 调用](#重复调用与-codex-技能) · [恢复文件](docs/user-guide.md#旧版本与恢复)
 
-```powershell
-python backup.py bind --source "G:\Work" --destination "H:\Work"
-python backup.py plan
-```
+</div>
 
-`bind` 只在工具目录写入 `config.local.json`，记录方向、卷序列号和目录标识，避免盘符被另一块硬盘占用后误写。两个数据目录必须已存在。配置不提交 GitHub。
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/assets/backup-flow-mobile.svg">
+  <img src="docs/assets/backup-flow.svg" alt="备份流程示意：工作盘 → 只复制新增与改动 → 移动硬盘；覆盖前保留旧版本，完成后校验。">
+</picture>
 
-`plan` 是预览，不写入 G/H 数据，只在工具目录产生本地日志；检查日志后正式运行：
+面向 Windows 本地文件夹和外接硬盘的增量备份工作流，基于 [rclone](https://github.com/rclone/rclone)。
+适合已经有一份硬盘副本、以后只想更新差异的场景；目标文件依然是能直接打开的普通文件。
 
-```powershell
-python backup.py run
-```
-
-也可以双击 `Preview.cmd` 预览、`Backup.cmd` 备份、`Verify.cmd` 校验。备份启动器有 Y/N 提示。
-随时单独复核：
-
-```powershell
-python backup.py verify
-```
+> **开始前请确认方向：源目录是主版本。** 同名文件内容不同时，会先保存目标旧版本，再用源文件替换；目标独有文件保留。这里的“备份”是单向更新，不合并两边独立编辑的内容。
 
 ## 备份规则
 
-| 情况 | 行为 |
-|---|---|
-| 两边相对路径、内容相同 | 不复制文件内容 |
-| 源目录新增文件 | 复制到目标同一路径 |
-| 同一路径内容改动 | 目标旧文件移入版本目录，再复制源文件 |
-| 文件只在目标存在 | 保留，不删除 |
-| 源文件被删除或改名 | 目标旧文件保留；改名后的新路径按新增复制 |
-| 空目录 | 创建对应目录 |
-| 隐藏文件 | 默认包含，不自动排除 `.git` 等目录 |
-| 源目录内部符号链接、目录联接 | rclone 跳过并写入警告，不备份链接指向内容 |
-| 目标目录内链接或重解析点 | 拒绝运行，先人工检查 |
-| 盘符、卷或目录身份变化 | 拒绝运行，避免写错盘 |
+用一次普通更新就能理解：
 
-实际调用的是 `rclone copy --checksum --backup-dir ...`，不是镜像删除模式。
-两个目录是本地路径，不使用云端，也不把数据发送到 GitHub。
-清除子进程的 `RCLONE_*` 环境变量，并用内存空配置，避免既有 rclone 设置改变本工具行为。
+| 你的文件 | 两边的情况 | 本次备份会做什么 |
+|---|---|---|
+| `论文.pdf` | 内容相同 | 跳过，不重复传输 |
+| `结果.csv` | 源文件已修改 | 归档目标旧文件，再复制新内容 |
+| `新实验.xlsx` | 只在源目录存在 | 复制到目标的对应位置 |
+| `历史资料.zip` | 只在移动硬盘存在 | 保留，不删除 |
+| `旧文件.txt` | 从源目录删除 | 硬盘里的副本仍保留 |
 
-默认用大小和内容校验和判断是否复制。**增量指减少传输，不表示可以跳过扫描和读盘。**
-备份结束后用 `rclone check --one-way --download` 逐字节读取两边源文件对应内容复核；目标额外文件不视为失败。
-日志与 JSON 报告在 `logs/`，`status=success` 且退出码为 0 才代表此次操作完成；预览状态是 `preview`。
-目录不可用、磁盘身份不符等预检查失败会直接在终端返回错误和非零退出码，尚不会创建运行报告。
-校验覆盖文件内容，不校验 Windows ACL、备用数据流、所有者、空目录元数据或历史版本完整性。
+**默认按内容校验和判断差异，复制完成后逐字节复核。** 增量减少传输量，但仍需要扫描和读盘；大量视频、压缩包或小文件可能让检查耗时明显长于复制本身。
 
-可以用 `python backup.py plan --fast` 按大小和时间快速预览；这可能漏掉大小、时间相同的内容变化。
-`run --fast` 仍执行完整内容复核，发现漏项会失败；此时使用默认 `run` 修复。
-预览是实时判断，不是冻结清单，预览后继续修改文件会改变正式执行结果。
+## 快速使用
 
-## 旧版本与恢复
+### 1 · 准备工具与目录
 
-如果目标为 `H:\Work`，旧版本保存在旁边：
-
-```text
-H:\Work\                         当前文件，直接用资源管理器打开
-H:\Work.versions\
-  20261025T...Z-随机标识\           某次运行被替换的目标旧文件
-    子目录\论文.docx
-```
-
-版本目录只包含该次被替换的旧文件，**不是完整时间点快照**。初次接入也不会为所有未变文件再做一份副本。
-不自动清理历史，以便你决定保留多久；目标空闲容量需容纳新增数据、历史和传输临时文件。
-
-恢复时优先从 H 盘当前目录取文件；需要覆盖前版本时，到对应版本目录查找同一相对路径。
-先复制到单独的恢复目录，打开确认后再决定是否替换工作文件。例如：
+需要 **Windows、Python 3.10+** 和 [rclone 官方 Windows 版](https://rclone.org/downloads/)。
+将 rclone 加入 PATH，或将官方 ZIP 解压到 `vendor/`；[安装细节](docs/user-guide.md#快速使用)。两个数据目录必须已存在。
 
 ```powershell
-Copy-Item -LiteralPath "H:\Work.versions\某次运行\子目录\论文.docx" -Destination "G:\Recovery\论文.docx"
+git clone https://github.com/Elio-SiChien/incremental-backup.git
+cd incremental-backup
 ```
 
-提前创建 `G:\Recovery`。本工具不提供自动覆盖工作盘的恢复命令。
+### 2 · 先预览差异
 
-## 中断与限制
+下面以 `G:\Work` → `H:\Work` 为例，替换成你的实际目录：
 
-- 运行前关闭持续写入的数据程序。它不是 VSS 或数据库一致性快照；校验通过也不保证应用级多文件事务一致性。
-- 不拔盘，完成后安全弹出。失败或中断后查看日志，可重新运行，已相同文件会跳过。
-- 版本归档与新文件写入不是整体事务。中断后旧内容可能已归档，目标对应路径尚未更新；请先查看版本目录，再重跑。
-- 同一个目标只允许一个写入任务。进程被强制结束可能留下目标旁的 `.目录名.incremental-backup.lock`。确认没有备份进程后才能手动移除锁。
-- 运行期间不要由其他工具修改目标或替换目录联接。本工具的预检查不防御并发恶意篡改。
-- 盘身份检查防止常见误操作，不是密码学硬件认证。更换/格式化磁盘、重建目录后，人工核对再另存配置并重新绑定。
-- 复制以整个改动文件为单位。100 GB 文件只改一处，也可能复制整个文件；需要分块去重时应另建 restic 仓库。
-- 同步副本不能替代异地备份。当前工作流提供一份外接盘副本和覆盖历史；可后续另加一份离线或异地副本。
+```powershell
+python job.py plan --source "G:\Work" --destination "H:\Work" --fast
+```
+
+自动为这组路径创建或复用本地配置。预览只写工具本地日志，不复制文件到目标盘。
+`--fast` 按大小与修改时间估算，可能漏掉大小、时间不变的内容变化；正式备份默认重新按内容判断。
+
+### 3 · 正式备份并自动校验
+
+确认预览方向和目标空间后运行：
+
+```powershell
+python job.py run --source "G:\Work" --destination "H:\Work"
+```
+
+被替换的旧文件保存在 `H:\Work.versions\运行标识\`；运行日志和报告在工具目录的 `logs/`。
+**正式任务退出码为 0，且报告的 `status` 为 `success`，才表示复制和校验均已完成。**
+
+已配置默认任务？也可使用 [Preview.cmd](Preview.cmd) 预览、[Backup.cmd](Backup.cmd) 备份、[Verify.cmd](Verify.cmd) 校验。首次绑定方式见[使用指南](docs/user-guide.md#快速使用)。
 
 ## 重复调用与 Codex 技能
 
-以后可以直接说：“把 `G:\Project` 新增和改动的文件备份到 `H:\Project`，保留旧版本。”
-全局 `incremental-backup` Skill 支持自动匹配请求；也可显式写 `$incremental-backup`。
-方案及与 rclone 的职责区别见 [全局技能方案](docs/workflow-plan.md)。
+安装并配置仓库内的 [incremental-backup Skill](skills/incremental-backup/SKILL.md) 后，直接告诉 Codex：
 
-多组目录无需覆盖默认配置：
+> 把 `G:\项目目录` 新增和改动的文件备份到 `H:\项目目录`，保留旧版本。
 
-```powershell
-python job.py plan --source "G:\Project" --destination "H:\Project" --fast
-python job.py run --source "G:\Project" --destination "H:\Project"
-```
+也可显式使用 `$incremental-backup`。不同路径组合保存独立配置，无需覆盖已有任务；只要求“看看差异”时只预览。
 
-程序复用匹配的已有绑定，新组合保存到不公开的 `profiles/`。正式备份默认仍用内容比较和完整复核。
-全局技能的入口为 `scripts/backup_job.py`，安装时在技能目录增加私有 `runtime.local.json`，
-格式为 `{"repository": "本机工具仓库的绝对路径"}`。这让其他工作目录里的聊天也能定位工具。
+[查看全局安装与配置方法 →](docs/user-guide.md#重复调用与-codex-技能)
 
-日常流程：接上移动硬盘 → 双击 `Preview.cmd` 看日志 → 双击 `Backup.cmd` → 确认成功 → 安全弹出。
-不默认设置定时任务，避免移动硬盘不在时反复运行。确需计划任务时，程序支持直接用命令调用并返回退出码。
+## 为什么基于 rclone
 
-仓库包含 `skills/incremental-backup/SKILL.md`。将此文件夹安装到 `~/.codex/skills/` 后，可说：
+| 层面 | rclone 提供 | 本项目补充 |
+|---|---|---|
+| 数据处理 | 文件比较、复制、旧文件归档、内容复核 | 固定为单向、不删除目标独有文件的备份流程 |
+| 操作入口 | 命令行及参数 | 双击启动器、按路径管理任务、Codex 自然语言调用 |
+| 运行保护 | 底层传输与重试能力 | 卷与目录身份检查、路径检查、目标独占锁、运行报告 |
 
-> 使用 $incremental-backup 预览我的备份差异。
->
-> 使用 $incremental-backup 将工作盘的新增和改动文件备份到移动硬盘。
+本项目封装成熟能力，没有另造文件复制引擎，也不提高硬盘的物理速度。[设计与职责说明 →](docs/workflow-plan.md)
 
-配置运行指针后无需每次提供工具仓库位置。技能遵守预览与正式备份的授权范围，报告日志和版本位置。
+## 文档与支持
+
+<a id="旧版本与恢复"></a>
+<a id="中断与限制"></a>
+
+| 你想了解 | 入口 |
+|---|---|
+| 安装、默认任务、多组目录和常用命令 | [完整使用指南](docs/user-guide.md) |
+| 找回被替换的文件 | [旧版本与恢复](docs/user-guide.md#旧版本与恢复) |
+| 拔盘、中断、占用、磁盘身份变化 | [中断与限制](docs/user-guide.md#中断与限制) |
+| 方案原理、耗时与 rclone 的区别 | [工作流方案](docs/workflow-plan.md) |
+| 为什么选择这条技术路线 | [开源方案调研](docs/research.md) |
+| 遇到问题或提出改进建议 | [GitHub Issues](https://github.com/Elio-SiChien/incremental-backup/issues) |
+
+**使用边界：** 旧版本目录不是完整时间点快照；源目录中的链接会被跳过；不备份 ACL、备用数据流等 Windows 元数据。运行时请保持硬盘连接，并暂停持续写入的应用。更多边界见[使用指南](docs/user-guide.md#中断与限制)。
 
 ## 开发与验证
 
@@ -132,10 +114,12 @@ python job.py run --source "G:\Project" --destination "H:\Project"
 python -m unittest discover -s tests -v
 ```
 
-测试仅在临时目录创建数据。包含真实 rclone 的预览、增量、同大小同时间内容变化、重复执行零传输、保留目标独有文件、源端删除不传播、错误检测和历史恢复。
-未安装 rclone 时本地集成测试会跳过；CI 必须安装，否则失败。
-Windows GitHub Actions 测试模板见 `docs/ci-windows.yml`。当前发布凭据不含 `workflow` 权限，
-因此没有自动启用 Actions；以后可在 GitHub 网页将其放到 `.github/workflows/test.yml` 启用。
+测试在临时目录验证增量复制、重复执行零传输、历史恢复和多路径配置。
+本地未安装 rclone 时会跳过集成测试；[Windows CI 配置](docs/ci-windows.yml) 目前作为模板提供，尚未启用 GitHub Actions。
 
-公开仓库仅保存代码、文档、测试和技能。个人配置、日志、官方二进制、研究数据不提交。
-调研依据和选型见 [docs/research.md](docs/research.md)。MIT 许可证；rclone 是独立依赖，使用其自身 MIT 许可证。
+## 致谢与许可证
+
+数据比较与传输由 [rclone](https://github.com/rclone/rclone) 提供。
+首页结构参考 [Best-README-Template](https://github.com/othneildrew/Best-README-Template) 与 [awesome-readme](https://github.com/matiassingers/awesome-readme)，徽章使用 [Shields.io](https://shields.io/)，流程图为本项目原创示意。
+
+本项目采用 [MIT 许可证](LICENSE)。个人路径配置、日志、研究数据和依赖二进制不提交到本仓库。
