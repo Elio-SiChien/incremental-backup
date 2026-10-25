@@ -12,6 +12,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 import uuid
 
 BASE = Path(__file__).resolve().parent
@@ -26,6 +27,26 @@ def no_links(path: Path) -> None:
             continue
         if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
             raise ValueError(f"Link/reparse point is not supported: {part}")
+
+
+def inspect_destination(dst: Path) -> None:
+    """Inspect each entry once; scandir reuses Windows directory metadata."""
+    pending = [dst]
+    count = 0
+    updated = time.monotonic()
+    while pending:
+        with os.scandir(pending.pop()) as entries:
+            for entry in entries:
+                info = entry.stat(follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                    raise ValueError(f"Link/reparse point is not supported: {entry.path}")
+                if stat.S_ISDIR(info.st_mode):
+                    pending.append(Path(entry.path))
+                count += 1
+                if time.monotonic() - updated >= 10:
+                    print(f"Safety scan: {count:,} entries checked", flush=True)
+                    updated = time.monotonic()
+    print(f"Safety scan complete: {count:,} entries checked", flush=True)
 
 
 def folder(value: str) -> Path:
@@ -137,9 +158,7 @@ def execute(config: dict, action: str, exe: str, fast: bool, logs: Path) -> dict
         raise ValueError("Logs must be outside source, destination and versions")
     # Fail closed if a destination tree contains any reparse points. rclone does
     # not follow source links, but pre-existing destination links need guarding.
-    for root, dirs, files in os.walk(dst, followlinks=False, onerror=lambda e: (_ for _ in ()).throw(e)):
-        for name in dirs + files:
-            no_links(Path(root) / name)
+    inspect_destination(dst)
     logs.mkdir(parents=True, exist_ok=True)
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ-") + uuid.uuid4().hex[:8]
     report = {"run_id": run_id, "action": action, "comparison": "size-time" if fast else "checksum",
