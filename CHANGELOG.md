@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0.2 — 2026-10-25
+
+- Add independent private profiles for arbitrary source/destination pairs.
+- Make the global Codex skill discoverable from natural-language requests, with a private repository pointer and portable launcher.
+- Document the workflow, rclone responsibilities and full verification time costs.
+
 ## 0.1.0.1 — 2026-10-25
 
 - Inspect destination entries once with cached directory metadata, avoiding repeated ancestor checks for every file.

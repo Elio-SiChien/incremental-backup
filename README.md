@@ -100,6 +100,21 @@ Copy-Item -LiteralPath "H:\Work.versions\某次运行\子目录\论文.docx" -De
 
 ## 重复调用与 Codex 技能
 
+以后可以直接说：“把 `G:\Project` 新增和改动的文件备份到 `H:\Project`，保留旧版本。”
+全局 `incremental-backup` Skill 支持自动匹配请求；也可显式写 `$incremental-backup`。
+方案及与 rclone 的职责区别见 [全局技能方案](docs/workflow-plan.md)。
+
+多组目录无需覆盖默认配置：
+
+```powershell
+python job.py plan --source "G:\Project" --destination "H:\Project" --fast
+python job.py run --source "G:\Project" --destination "H:\Project"
+```
+
+程序复用匹配的已有绑定，新组合保存到不公开的 `profiles/`。正式备份默认仍用内容比较和完整复核。
+全局技能的入口为 `scripts/backup_job.py`，安装时在技能目录增加私有 `runtime.local.json`，
+格式为 `{"repository": "本机工具仓库的绝对路径"}`。这让其他工作目录里的聊天也能定位工具。
+
 日常流程：接上移动硬盘 → 双击 `Preview.cmd` 看日志 → 双击 `Backup.cmd` → 确认成功 → 安全弹出。
 不默认设置定时任务，避免移动硬盘不在时反复运行。确需计划任务时，程序支持直接用命令调用并返回退出码。
 
@@ -109,7 +124,7 @@ Copy-Item -LiteralPath "H:\Work.versions\某次运行\子目录\论文.docx" -De
 >
 > 使用 $incremental-backup 将工作盘的新增和改动文件备份到移动硬盘。
 
-调用时告诉 Codex 工具仓库在本机的位置。技能遵守预览与正式备份的授权范围，报告日志和版本位置。
+配置运行指针后无需每次提供工具仓库位置。技能遵守预览与正式备份的授权范围，报告日志和版本位置。
 
 ## 开发与验证
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "移动硬盘增量备份"
+  short_description: "提供源目录和硬盘目标目录，自动预览差异、保留旧版本、增量备份并校验"
+  default_prompt: "使用 $incremental-backup 把我提供的源目录新增和改动文件备份到目标硬盘目录，保留旧版本并校验。"
+policy:
+  allow_implicit_invocation: true
